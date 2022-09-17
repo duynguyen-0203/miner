@@ -1,6 +1,8 @@
 from abc import ABC
+from typing import Tuple
 
 import torch
+from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as torch_f
 from transformers import RobertaConfig, RobertaModel, RobertaPreTrainedModel
@@ -34,25 +36,25 @@ class Miner(ABC, RobertaPreTrainedModel):
 
         self.init_weights()
 
-    def forward(self, history_encoding: torch.tensor, history_attn_mask: torch.tensor,
-                history_category_encoding: torch.tensor, history_mask: torch.tensor, candidate_encoding: torch.tensor,
-                candidate_attn_mask: torch.tensor, candidate_category_encoding: torch.tensor):
-        """
+    def forward(self, history_encoding: Tensor, history_attn_mask: Tensor, history_category_encoding: Tensor,
+                history_mask: Tensor, candidate_encoding: Tensor, candidate_attn_mask: Tensor,
+                candidate_category_encoding: Tensor) -> Tuple[Tensor, Tensor]:
+        r"""
         Forward propagation
-        :param history_encoding:
-        :param history_attn_mask:
-        :param history_category_encoding:
-        :param history_mask:
-        :param candidate_encoding:
-        :param candidate_attn_mask:
-        :param candidate_category_encoding:
-        :type history_encoding: torch.tensor, shape [batch_size, his_length, seq_length]
-        :type history_attn_mask: torch.tensor, shape [batch_size, his_length, seq_length]
-        :type history_category_encoding: torch.tensor, shape [batch_size, his_length]
-        :type candidate_encoding: torch.tensor, shape [batch_size, num_candidates, seq_length]
-        :type candidate_attn_mask: torch.tensor, shape [batch_size, num_candidates, seq_length]
-        :type candidate_category_encoding: torch.tensor, shape [batch_size, num_candidates]
-        :return:
+
+        Args:
+            history_encoding: tensor of shape ``(batch_size, his_length, seq_length)``
+            history_attn_mask: tensor of shape ``(batch_size, his_length, seq_length)``
+            history_category_encoding: tensor of shape ``(batch_size, his_length)``
+            history_mask: tensor of shape ``(batch_size, his_length)``
+            candidate_encoding: tensor of shape ``(batch_size, num_candidates, seq_length)``
+            candidate_attn_mask: tensor of shape ``(batch_size, num_candidates, seq_length)``
+            candidate_category_encoding: tensor of shape ``(batch_size, num_candidates)``
+
+        Returns:
+            tuple:
+                - multi_user_interest: tensor of shape ``(batch_size, num_context_codes, embed_dim)``
+                - matching_scores: tensor of shape ``(batch_size, num_candidates)``
         """
         batch_size = history_encoding.shape[0]
         his_length = history_encoding.shape[1]
@@ -78,8 +80,11 @@ class Miner(ABC, RobertaPreTrainedModel):
             history_category_embed = nn.Dropout(history_category_embed)
             candidate_category_embed = self.category_embedding(candidate_category_encoding)
             candidate_category_embed = nn.Dropout(candidate_category_embed)
-            category_bias =
-        multi_user_interest = self.poly_attn(embeddings=history_repr, attn_mask=history_mask, bias=None)
+            category_bias = pairwise_cosine_similarity(history_category_embed, candidate_category_embed)
+
+            multi_user_interest = self.poly_attn(embeddings=history_repr, attn_mask=history_mask, bias=category_bias)
+        else:
+            multi_user_interest = self.poly_attn(embeddings=history_repr, attn_mask=history_mask, bias=None)
 
         # Click predictor
         matching_scores = torch.matmul(candidate_repr, multi_user_interest.permute(0, 2, 1))
@@ -101,29 +106,44 @@ class Miner(ABC, RobertaPreTrainedModel):
 
 
 class PolyAttention(nn.Module):
+    r"""
+    Implementation of Poly attention scheme that extracts `K` attention vectors through `K` additive attentions
+    """
     def __init__(self, in_embed_dim: int, num_context_codes: int, context_code_dim: int):
+        r"""
+        Initialization
+
+        Args:
+            in_embed_dim: The number of expected features in the input ``embeddings``
+            num_context_codes: The number of attention vectors ``K``
+            context_code_dim: The number of features in a context code
+        """
         super().__init__()
         self.linear = nn.Linear(in_features=in_embed_dim, out_features=context_code_dim, bias=False)
         self.context_codes = nn.Parameter(nn.init.xavier_uniform_(torch.empty(num_context_codes, context_code_dim),
                                                                   gain=nn.init.calculate_gain('tanh')))
 
-    def forward(self, embeddings: torch.tensor, attn_mask: torch.tensor, bias: torch.tensor):
-        """
+    def forward(self, embeddings: Tensor, attn_mask: Tensor, bias: Tensor = None):
+        r"""
         Forward propagation
-        :param embeddings: The sequence of historical user behaviors' representation
-        :param attn_mask: Mask to avoid focusing attention on padding behavior indices.
-        :param bias:
-        :type embeddings: torch.tensor, shape [batch_size, his_length, embed_dim]
-        :type attn_mask: torch.tensor, shape [batch_size, his_length]
-        :return:
-        :rtype: torch.tensor, shape [batch_size, num_context_codes, embed_dim]
+
+        Args:
+            embeddings: tensor of shape ``(batch_size, his_length, embed_dim)``
+            attn_mask: tensor of shape ``(batch_size, his_length)``
+            bias: tensor of shape ``(batch_size, his_length, num_candidates)``
+
+        Returns:
+            A tensor of shape ``(batch_size, num_context_codes, embed_dim)``
+
         """
         proj = torch.tanh(self.linear(embeddings))
         if bias is None:
-            weights = torch.matmul(proj, self.context_codes.T).permute(0, 2, 1)
+            weights = torch.matmul(proj, self.context_codes.T)
         else:
-            weights = torch.matmul(proj, self.context_codes.T).permute(0, 2, 1) + bias
-        weights = weights.masked_fill_(~attn_mask, 1e-30)
+            bias = bias.mean(dim=2).unsqueeze(dim=2)
+            weights = torch.matmul(proj, self.context_codes.T) + bias
+        weights = weights.permute(0, 2, 1)
+        weights = weights.masked_fill_(~attn_mask.unsqueeze(dim=1), 1e-30)
         weights = torch_f.softmax(weights, dim=2)
         poly_repr = torch.matmul(weights, embeddings)
 
@@ -131,21 +151,30 @@ class PolyAttention(nn.Module):
 
 
 class TargetAwareAttention(nn.Module):
+    r"""
+    Implementation of target-aware attention network
+    """
     def __init__(self, embed_dim: int):
+        r"""
+        Initialization
+
+        Args:
+            embed_dim: The number of features in query and key vectors
+        """
         super().__init__()
         self.linear = nn.Linear(in_features=embed_dim, out_features=embed_dim, bias=False)
 
-    def forward(self, query: torch.tensor, key: torch.tensor, value: torch.tensor):
-        """
+    def forward(self, query: Tensor, key: Tensor, value: Tensor):
+        r"""
         Forward propagation
-        :param query:
-        :param key:
-        :param value:
-        :type query: torch.tensor, shape [batch_size, num_context_codes, embed_dim]
-        :type key: torch.tensor, shape [batch_size, num_candidates, embed_dim]
-        :type value: torch.tensor, shape [batch_size, num_candidates, num_context_codes]
-        :return:
-        :rtype: torch.tensor, shape [batch_size, num_candidates]
+
+        Args:
+            query: tensor of shape ``(batch_size, num_context_codes, embed_dim)``
+            key: tensor of shape ``(batch_size, num_candidates, embed_dim)``
+            value: tensor of shape ``(batch_size, num_candidates, num_context_codes)``
+
+        Returns:
+            tensor of shape ``(batch_size, num_candidates)``
         """
         proj = torch_f.gelu(self.linear(query))
         weights = torch_f.softmax(torch.matmul(key, proj.permute(0, 2, 1)))
@@ -154,24 +183,19 @@ class TargetAwareAttention(nn.Module):
         return outputs
 
 
-def pairwise_cosine_similarity(x: torch.tensor, y: torch.tensor) -> torch.tensor:
-    """
+def pairwise_cosine_similarity(x: Tensor, y: Tensor) -> Tensor:
+    r"""
     Calculates the pairwise cosine similarity matrix
-    :param x:
-    :param y:
-    :type x: torch.tensor, shape [batch_size, M, d]
-    :type y: torch.tensor, shape [batch_size, N, d]
-    :return:
+
+    Args:
+        x: tensor of shape ``(batch_size, M, d)``
+        y: tensor of shape ``(batch_size, N, d)``
+
+    Returns:
+        A tensor of shape ``(batch_size, M, N)``
     """
     x_norm = torch.linalg.norm(x, dim=2, keepdim=True)
     y_norm = torch.linalg.norm(y, dim=2, keepdim=True)
-    result = torch.matmul(x_norm, y_norm.permute(0, 2, 1))
+    result = torch.matmul(torch.div(x, x_norm), torch.div(y, y_norm).permute(0, 2, 1))
 
     return result
-
-
-
-
-
-
-
