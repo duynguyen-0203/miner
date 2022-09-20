@@ -1,0 +1,35 @@
+--model_name Miner
+--pretrained_tokenizer vinai/phobert-base
+--user2id_path data/user2id.json
+--category2id_path data/category2id.json
+--max_title_length 32
+--max_sapo_length 128
+--his_length 20
+--seed 36
+--metrics auc
+--data_name CafeF_News_Recommend_Data
+--train_behaviors_path data/train/behaviors.tsv
+--train_news_path data/train/news.tsv
+--eval_behaviors_path data/valid/behaviors.tsv
+--eval_news_path data/valid/news.tsv
+--pretrained_embedding vinai/phobert-base
+--apply_reduce_dim
+--word_embed_dim 256
+--num_context_codes 32
+--context_code_dim 200
+--score_type weighted
+--dropout 0.2
+--npratio 4
+--train_batch_size 16
+--eval_batch_size 64
+--dataloader_drop_last
+--dataloader_num_workers 4
+--gradient_accumulation_steps 8
+--num_train_epochs 5
+--learning_rate 2e-5
+--warmup_ratio 0.1
+--max_grad_norm 1.0
+--weight_decay 0.01
+--logging_steps 200
+--evaluation_info metrics
+--eval_steps 400

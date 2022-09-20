@@ -7,11 +7,34 @@ import torch.nn as nn
 import torch.nn.functional as torch_f
 from transformers import RobertaConfig, RobertaModel, RobertaPreTrainedModel
 
+from src.utils import pairwise_cosine_similarity
+
 
 class Miner(ABC, RobertaPreTrainedModel):
+    r"""
+    Implementation of Multi-interest matching network for news recommendation. Please see the paper in
+    https://aclanthology.org/2022.findings-acl.29.pdf.
+    """
     def __init__(self, config: RobertaConfig, apply_reduce_dim: bool, reduce_dim: int, use_category_bias: bool,
                  num_category: int, category_embed_dim: int, category_pad_token_id: int, num_context_codes: int,
                  context_code_dim: int, score_type: str, dropout: float):
+        r"""
+        Initialization
+
+        Args:
+            config: The configuration of a Roberta Model
+            apply_reduce_dim: Whether to reduce the dimension of word embeddings
+            reduce_dim: The size of each word embedding vector if ``apply_reduce_dim``
+            use_category_bias: Whether to use Category-aware attention weighting
+            num_category: The size of the dictionary of categories
+            category_embed_dim: The size of each category embedding vector
+            category_pad_token_id: ID of the padding token type in the category vocabulary
+            num_context_codes: The number of attention vectors ``K``
+            context_code_dim: The number of features in a context code
+            score_type: The ways to aggregate the ``K`` matching scores as a final user click score ('max', 'mean' or
+                'weighted')
+            dropout: Dropout value
+        """
         super().__init__(config)
         self.roberta = RobertaModel(config)
         self.apply_reduce_dim = apply_reduce_dim
@@ -25,6 +48,7 @@ class Miner(ABC, RobertaPreTrainedModel):
         if self.use_category_bias:
             self.category_embedding = nn.Embedding(num_embeddings=num_category, embedding_dim=category_embed_dim,
                                                    padding_idx=category_pad_token_id)
+            self.category_dropout = nn.Dropout(dropout)
             self.category_weight = nn.Parameter(torch.randn(1))
 
         self.poly_attn = PolyAttention(in_embed_dim=self._news_embed_dim, num_context_codes=num_context_codes,
@@ -63,7 +87,8 @@ class Miner(ABC, RobertaPreTrainedModel):
         # Representation of candidate news
         candidate_encoding = candidate_encoding.view(batch_size * num_candidates, -1)
         candidate_attn_mask = candidate_attn_mask.view(batch_size * num_candidates, -1)
-        candidate_embedding = self.roberta(input_ids=candidate_encoding, attention_mask=candidate_attn_mask)
+        candidate_embedding = self.roberta(input_ids=candidate_encoding, attention_mask=candidate_attn_mask)[0]
+
         candidate_repr = candidate_embedding[:, 0, :]
         candidate_repr = candidate_repr.view(batch_size, num_candidates, -1)
 
@@ -74,25 +99,32 @@ class Miner(ABC, RobertaPreTrainedModel):
         history_repr = history_embedding[:, 0, :]
         history_repr = history_repr.view(batch_size, his_length, -1)
 
+        if self.apply_reduce_dim:
+            candidate_repr = self.reduce_embed_dim(candidate_repr)
+            candidate_repr = self.dropout(candidate_repr)
+            history_repr = self.reduce_embed_dim(history_repr)
+            history_repr = self.dropout(history_repr)
+
         # Multi-interest user modeling
         if self.use_category_bias:
             history_category_embed = self.category_embedding(history_category_encoding)
-            history_category_embed = nn.Dropout(history_category_embed)
+            history_category_embed = self.category_dropout(history_category_embed)
             candidate_category_embed = self.category_embedding(candidate_category_encoding)
-            candidate_category_embed = nn.Dropout(candidate_category_embed)
+            candidate_category_embed = self.category_dropout(candidate_category_embed)
             category_bias = pairwise_cosine_similarity(history_category_embed, candidate_category_embed)
 
             multi_user_interest = self.poly_attn(embeddings=history_repr, attn_mask=history_mask, bias=category_bias)
         else:
             multi_user_interest = self.poly_attn(embeddings=history_repr, attn_mask=history_mask, bias=None)
+        multi_user_interest = self.dropout(multi_user_interest)
 
         # Click predictor
         matching_scores = torch.matmul(candidate_repr, multi_user_interest.permute(0, 2, 1))
-        if self._score_type == 'max':
+        if self.score_type == 'max':
             matching_scores = matching_scores.max(dim=2)[0]
-        elif self._score_type == 'mean':
+        elif self.score_type == 'mean':
             matching_scores = matching_scores.mean(dim=2)
-        elif self._score_type == 'weighted':
+        elif self.score_type == 'weighted':
             matching_scores = self.target_aware_attn(query=multi_user_interest, key=candidate_repr,
                                                      value=matching_scores)
         else:
@@ -134,7 +166,6 @@ class PolyAttention(nn.Module):
 
         Returns:
             A tensor of shape ``(batch_size, num_context_codes, embed_dim)``
-
         """
         proj = torch.tanh(self.linear(embeddings))
         if bias is None:
@@ -151,9 +182,7 @@ class PolyAttention(nn.Module):
 
 
 class TargetAwareAttention(nn.Module):
-    r"""
-    Implementation of target-aware attention network
-    """
+    """Implementation of target-aware attention network"""
     def __init__(self, embed_dim: int):
         r"""
         Initialization
@@ -177,25 +206,7 @@ class TargetAwareAttention(nn.Module):
             tensor of shape ``(batch_size, num_candidates)``
         """
         proj = torch_f.gelu(self.linear(query))
-        weights = torch_f.softmax(torch.matmul(key, proj.permute(0, 2, 1)))
+        weights = torch_f.softmax(torch.matmul(key, proj.permute(0, 2, 1)), dim=2)
         outputs = torch.mul(weights, value).sum(dim=2)
 
         return outputs
-
-
-def pairwise_cosine_similarity(x: Tensor, y: Tensor) -> Tensor:
-    r"""
-    Calculates the pairwise cosine similarity matrix
-
-    Args:
-        x: tensor of shape ``(batch_size, M, d)``
-        y: tensor of shape ``(batch_size, N, d)``
-
-    Returns:
-        A tensor of shape ``(batch_size, M, N)``
-    """
-    x_norm = torch.linalg.norm(x, dim=2, keepdim=True)
-    y_norm = torch.linalg.norm(y, dim=2, keepdim=True)
-    result = torch.matmul(torch.div(x, x_norm), torch.div(y, y_norm).permute(0, 2, 1))
-
-    return result
