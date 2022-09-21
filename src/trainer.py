@@ -205,13 +205,13 @@ class Trainer(BaseTrainer):
         batch = utils.to_device(batch, self._device)
         if self.args.fp16:
             with torch.autocast(device_type=self._device.type, dtype=torch.float16):
-                logits = self._forward_step(model, batch)
-                loss = loss_calculator.compute(logits, batch['label'])
+                poly_attn, logits = self._forward_step(model, batch)
+                loss = loss_calculator.compute(poly_attn, logits, batch['label'])
                 loss = loss / accumulation_factor
             self.scaler.scale(loss).backward()
         else:
-            logits = self._forward_step(model, batch)
-            loss = loss_calculator.compute(logits, batch['label'])
+            poly_attn, logits = self._forward_step(model, batch)
+            loss = loss_calculator.compute(poly_attn, logits, batch['label'])
             loss = loss / accumulation_factor
             loss.backward()
 
@@ -232,9 +232,9 @@ class Trainer(BaseTrainer):
         with torch.no_grad():
             for batch in tqdm(dataloader, total=len(dataloader), desc='Evaluation phase'):
                 batch = utils.to_device(batch, self._device)
-                logits = self._forward_step(model, batch)
+                poly_attn, logits = self._forward_step(model, batch)
                 if 'loss' in self.args.evaluation_info:
-                    batch_loss = loss_calculator.compute_eval_loss(logits, batch['label'])
+                    batch_loss = loss_calculator.compute_eval_loss(poly_attn, logits, batch['label'])
                     total_loss += batch_loss
                     total_pos_example += batch['label'].sum().item()
                 if 'metrics' in self.args.evaluation_info:
@@ -284,8 +284,8 @@ class Trainer(BaseTrainer):
 
     @staticmethod
     def _forward_step(model, batch):
-        _, logits = model(history_encoding=batch['his_title'], history_attn_mask=batch['his_title_mask'],
-                          history_category_encoding=batch['his_category'], history_mask=batch['his_mask'],
-                          candidate_encoding=batch['title'], candidate_attn_mask=batch['title_mask'],
-                          candidate_category_encoding=batch['category'])
-        return logits
+        poly_attn, logits = model(history_encoding=batch['his_title'], history_attn_mask=batch['his_title_mask'],
+                                  history_category_encoding=batch['his_category'], history_mask=batch['his_mask'],
+                                  candidate_encoding=batch['title'], candidate_attn_mask=batch['title_mask'],
+                                  candidate_category_encoding=batch['category'])
+        return poly_attn, logits

@@ -36,7 +36,7 @@ for non-click). The orders of news in an impressions
 have been shuffled.
 
 The **news.tsv** file contains the detailed information of news articles involved in the **behaviors.tsv** file.
-It has 3 columns, which are divided by the tab symbol:
+It has 4 columns, which are divided by the tab symbol:
 
 * **News ID** 
 * **Title** 
