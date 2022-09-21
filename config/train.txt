@@ -3,8 +3,8 @@
 --user2id_path data/user2id.json
 --category2id_path data/category2id.json
 --max_title_length 32
---max_sapo_length 128
---his_length 20
+--max_sapo_length 64
+--his_length 50
 --seed 36
 --metrics auc
 --data_name CafeF_News_Recommend_Data

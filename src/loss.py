@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-import torch
 from torch import Tensor
 import torch.nn.functional as torch_f
 
