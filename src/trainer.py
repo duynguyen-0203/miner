@@ -266,8 +266,10 @@ class Trainer(BaseTrainer):
             if not batch[0][key].shape:
                 padded_batch[key] = torch.stack(samples)
             else:
-                if key in ['history', 'impression']:
+                if key in ['his_title', 'title', 'his_sapo', 'sapo']:
                     padded_batch[key] = utils.padded_stack(samples, padding=self._tokenizer.pad_token_id)
+                elif key in ['his_category', 'category']:
+                    padded_batch[key] = utils.padded_stack(samples, padding=self._category2id['pad'])
                 else:
                     padded_batch[key] = utils.padded_stack(samples, padding=0)
 
