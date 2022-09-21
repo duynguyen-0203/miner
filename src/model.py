@@ -134,7 +134,7 @@ class Miner(ABC, RobertaPreTrainedModel):
 
     @property
     def news_embed_dim(self):
-        return self._embed_dim
+        return self._news_embed_dim
 
 
 class PolyAttention(nn.Module):
