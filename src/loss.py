@@ -28,7 +28,7 @@ class Loss(AbstractLoss):
         Returns:
             Loss value
         """
-        disagreement_loss = pairwise_cosine_similarity(poly_attn, poly_attn).mean()
+        disagreement_loss = pairwise_cosine_similarity(poly_attn, poly_attn, zero_diagonal=True).mean()
         targets = labels.argmax(dim=1)
         rank_loss = self._criterion(logits, targets)
         total_loss = disagreement_loss + rank_loss
