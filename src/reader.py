@@ -25,6 +25,8 @@ class Reader:
             behaviors_tsv = csv.reader(f, delimiter='\t')
             for i, line in enumerate(behaviors_tsv):
                 self._parse_train_line(i, line, news_dataset, dataset)
+                if i == 1:
+                    break
 
         return dataset
 
@@ -34,6 +36,8 @@ class Reader:
             behaviors_tsv = csv.reader(f, delimiter='\t')
             for i, line in enumerate(behaviors_tsv):
                 self._parse_eval_line(i, line, news_dataset, dataset)
+                if i == 0:
+                    break
 
         return dataset
 
@@ -44,32 +48,27 @@ class Reader:
         return dataset, news_dataset
 
     def _read_news_info(self, news_path: str, dataset: Dataset) -> dict:
-        """
+        r"""
         Read news information
 
         Args:
-            news_path: Path to
-            dataset:
+            news_path: path to TSV file containing all news information.
+            dataset: Dataset object.
 
         Returns:
             A dictionary
         """
         pad_news_obj = dataset.create_news(
-            [self._tokenizer.cls_token_id, self._tokenizer.eos_token_id]
-            + [self._tokenizer.pad_token_id] * (self._max_title_length - 2),
-            [self._tokenizer.cls_token_id, self._tokenizer.eos_token_id]
-            + [self._tokenizer.pad_token_id] * (self._max_sapo_length - 2),
-            self._category2id['pad'])
+            [self._tokenizer.cls_token_id, self._tokenizer.eos_token_id],
+            [self._tokenizer.cls_token_id, self._tokenizer.eos_token_id], self._category2id['pad'])
         news_dataset = {'pad': pad_news_obj}
         with open(news_path, mode='r', encoding='utf-8', newline='') as f:
             news_tsv = csv.reader(f, delimiter='\t')
             for line in news_tsv:
-                title_encoding = self._tokenizer.encode(line[constants.TITLE], add_special_tokens=True,
-                                                        padding='max_length', truncation=True,
+                title_encoding = self._tokenizer.encode(line[constants.TITLE], add_special_tokens=True, truncation=True,
                                                         max_length=self._max_title_length)
                 category_id = self._category2id.get(line[constants.CATEGORY], self._category2id['unk'])
-                sapo_encoding = self._tokenizer.encode(line[constants.SAPO], add_special_tokens=True,
-                                                       padding='max_length', truncation=True,
+                sapo_encoding = self._tokenizer.encode(line[constants.SAPO], add_special_tokens=True, truncation=True,
                                                        max_length=self._max_sapo_length)
                 news = dataset.create_news(title_encoding, sapo_encoding, category_id)
                 news_dataset[line[constants.NEWS_ID]] = news
@@ -77,14 +76,14 @@ class Reader:
         return news_dataset
 
     def _parse_train_line(self, impression_id, line, news_dataset, dataset):
-        """
+        r"""
         Parse a line of the training dataset
 
         Args:
-            impression_id: ID of the impression
-            line: Information about the impression ``(ID - User ID - Time - History - Behavior)``
-            news_dataset: A dictionary contains information about all the news ``(News ID - News object)``
-            dataset: Dataset object
+            impression_id: ID of the impression.
+            line: information about the impression ``(ID - User ID - Time - History - Behavior)``.
+            news_dataset: a dictionary contains information about all the news ``(News ID - News object)``.
+            dataset: Dataset object.
 
         Returns:
             None
@@ -107,14 +106,14 @@ class Reader:
             dataset.add_sample(user_id, history_clicked, impression)
 
     def _parse_eval_line(self, impression_id, line, news_dataset, dataset):
-        """
+        r"""
         Parse a line of the evaluation dataset
 
         Args:
-            impression_id: ID of the impression
-            line: Information about the impression ``(ID - User ID - Time - History - Behavior)``
-            news_dataset: A dictionary contains information about all the news ``(News ID - News object)``
-            dataset: Dataset object
+            impression_id: ID of the impression.
+            line: information about the impression ``(ID - User ID - Time - History - Behavior)``.
+            news_dataset: a dictionary contains information about all the news ``(News ID - News object)``.
+            dataset: Dataset object.
 
         Returns:
             None

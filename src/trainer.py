@@ -1,5 +1,6 @@
 import json
 import math
+import time
 from typing import List
 
 import torch
@@ -15,7 +16,8 @@ from src import utils
 from src.base_trainer import BaseTrainer
 from src.entities import Dataset
 from src.evaluation import FastEvaluator, SlowEvaluator
-from src.model import Miner
+from src.model.model import Miner
+from src.model.news_encoder import NewsEncoder
 from src.loss import Loss
 from src.reader import Reader
 
@@ -40,6 +42,12 @@ class Trainer(BaseTrainer):
         args = self.args
         self._log_arguments()
         self._logger.info(f'Model: {args.model_name}')
+
+        # Read pretrained embedding (if any)
+        if args.category_embed_path is not None:
+            category_embed = utils.load_embed(args.category_embed_path)
+        else:
+            category_embed = None
 
         # Read data
         reader = Reader(tokenizer=self._tokenizer, max_title_length=args.max_title_length,
@@ -77,12 +85,16 @@ class Trainer(BaseTrainer):
 
         # Create model
         config = RobertaConfig.from_pretrained(args.pretrained_embedding)
-        model = Miner.from_pretrained(args.pretrained_embedding, config=config, apply_reduce_dim=args.apply_reduce_dim,
-                                      reduce_dim=args.word_embed_dim, use_category_bias=args.use_category_bias,
-                                      num_category=len(self._category2id), category_embed_dim=args.category_embed_dim,
-                                      category_pad_token_id=self._category2id['pad'],
-                                      num_context_codes=args.num_context_codes, context_code_dim=args.context_code_dim,
-                                      score_type=args.score_type, dropout=args.dropout)
+        news_encoder = NewsEncoder.from_pretrained(args.pretrained_embedding, config=config,
+                                                   apply_reduce_dim=args.apply_reduce_dim, use_sapo=args.use_sapo,
+                                                   dropout=args.dropout, freeze_transformer=args.freeze_transformer,
+                                                   word_embed_dim=args.word_embed_dim, combine_type=args.combine_type,
+                                                   lstm_num_layers=args.lstm_num_layers, lstm_dropout=args.lstm_dropout)
+        model = Miner(news_encoder=news_encoder, use_category_bias=args.use_category_bias,
+                      num_context_codes=args.num_context_codes, context_code_dim=args.context_code_dim,
+                      score_type=args.score_type, dropout=args.dropout, num_category=len(self._category2id),
+                      category_embed_dim=args.category_embed_dim, category_pad_token_id=self._category2id['pad'],
+                      category_embed=category_embed)
         model.to(self._device)
         model.zero_grad(set_to_none=True)
 
@@ -101,6 +113,8 @@ class Trainer(BaseTrainer):
         logging_loss = 0.0
 
         for epoch in range(args.num_train_epochs):
+            epoch_start_time = time.time()
+            eval_time = 0.0
             self._logger.info(f'--------------- EPOCH {epoch} ---------------')
             steps_in_epoch = len(train_dataloader)
             epoch_loss = 0.0
@@ -143,6 +157,7 @@ class Trainer(BaseTrainer):
                         logging_loss = 0.0
 
                     if global_step % args.eval_steps == 0:
+                        eval_start_time = time.time()
                         valid_loss, scores = self._eval(model, eval_dataset, loss_calculator, metrics=args.metrics)
                         self._log_eval(global_step, valid_loss, scores)
 
@@ -156,9 +171,11 @@ class Trainer(BaseTrainer):
                                               f'at global step {global_step}')
                             best_auc_score = scores['auc']
                             self._save_model(model, optimizer, scheduler, flag='bestAucModel')
+                        eval_time += time.time() - eval_start_time
                 global_iteration += 1
 
             # Evaluation at the end of each epoch
+            eval_start_time = time.time()
             valid_loss, scores = self._eval(model, eval_dataset, loss_calculator, metrics=args.metrics)
             train_loss = epoch_loss / steps_in_epoch
             self._log_epoch(train_loss, valid_loss, scores, epoch)
@@ -170,6 +187,13 @@ class Trainer(BaseTrainer):
                 self._logger.info(f'Best AUC score updates from {best_auc_score} to {scores["auc"]}, at epoch {epoch}')
                 best_auc_score = scores['auc']
                 self._save_model(model, optimizer, scheduler, flag='bestAucModel')
+            eval_time += time.time() - eval_start_time
+
+            # Log running time
+            epoch_end_time = time.time()
+            self._logger.info(f'Total running time of epoch: {round(epoch_end_time - epoch_start_time, ndigits=4)} (s)')
+            self._logger.info(f'Total training time of epoch: '
+                              f'{round(epoch_end_time - epoch_start_time - eval_time, ndigits=4)} (s)')
 
         # Save final model
         self._save_model(model, optimizer, scheduler, flag='finalModel')
@@ -286,8 +310,9 @@ class Trainer(BaseTrainer):
 
     @staticmethod
     def _forward_step(model, batch):
-        poly_attn, logits = model(history_encoding=batch['his_title'], history_attn_mask=batch['his_title_mask'],
-                                  history_category_encoding=batch['his_category'], history_mask=batch['his_mask'],
-                                  candidate_encoding=batch['title'], candidate_attn_mask=batch['title_mask'],
-                                  candidate_category_encoding=batch['category'])
+        poly_attn, logits = model(title=batch['title'], title_mask=batch['title_mask'], his_title=batch['his_title'],
+                                  his_title_mask=batch['his_title_mask'], his_mask=batch['his_mask'],
+                                  sapo=batch['sapo'], sapo_mask=batch['sapo_mask'], his_sapo=batch['his_sapo'],
+                                  his_sapo_mask=batch['his_sapo_mask'], category=batch['category'],
+                                  his_category=batch['his_category'])
         return poly_attn, logits

@@ -6,11 +6,11 @@ from typing import List
 
 
 def reset_logger(logger: Logger):
-    """
+    r"""
     Remove all the filters and the handlers from this logger
 
     Args:
-        logger: A logger
+        logger: a logger.
 
     Returns:
         None
@@ -23,12 +23,12 @@ def reset_logger(logger: Logger):
 
 
 def log_csv(path: str, data: List[object]):
-    """
+    r"""
     Append a new line to a CSV log file already exists
 
     Args:
-        path: Path to CSV file
-        data: Newline data
+        path: path to CSV file.
+        data: newline data.
 
     Returns:
         None
@@ -39,12 +39,12 @@ def log_csv(path: str, data: List[object]):
 
 
 def create_csv(path: str, header: List[str] = None):
-    """
+    r"""
     Create a new CSV file
 
     Args:
-        path: Path to CSV file
-        header: The header of the CSV file
+        path: path to CSV file.
+        header: the header of the CSV file.
 
     Returns:
         None
@@ -57,13 +57,13 @@ def create_csv(path: str, header: List[str] = None):
 
 
 def log_json(path: str, data: dict, name: str):
-    """
+    r"""
     Log data to a JSON file
 
     Args:
-        path: Path to the JSON file
-        data: Data to record
-        name: Name of JSON file
+        path: path to the JSON file.
+        data: data to record.
+        name: name of JSON file.
 
     Returns:
         None

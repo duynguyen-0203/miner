@@ -78,12 +78,12 @@ class FastEvaluator(BaseEvaluator):
         pass
 
     def eval_batch(self, logits: Tensor, impression_ids: Tensor):
-        """
+        r"""
         Evaluation a batch
 
         Args:
-            logits: tensor of shape ``(batch_size, npratio + 1)``
-            impression_ids: tensor of shape ``(batch_size, npratio + 1)``
+            logits: tensor of shape ``(batch_size, npratio + 1)``.
+            impression_ids: tensor of shape ``(batch_size, npratio + 1)``.
 
         Returns:
             None
@@ -115,12 +115,12 @@ class SlowEvaluator(BaseEvaluator):
         self.prob_predictions = [i[1] for i in group_predictions]
 
     def eval_batch(self, logits: Tensor, impression_ids: Tensor):
-        """
+        r"""
         Evaluation a batch
 
         Args:
-            logits: tensor of shape ``(batch_size, 1)``
-            impression_ids: tensor of shape ``(batch_size, 1)``
+            logits: tensor of shape ``(batch_size, 1)``.
+            impression_ids: tensor of shape ``(batch_size, 1)``.
 
         Returns:
             None
@@ -131,12 +131,12 @@ class SlowEvaluator(BaseEvaluator):
 
 
 def compute_mrr_score(y_true: np.ndarray, y_score: np.ndarray):
-    """
+    r"""
     Calculate the MRR score
 
     Args:
-        y_true: Ground-truth labels
-        y_score: Predicted score
+        y_true: ground-truth labels.
+        y_score: predicted score.
 
     Returns:
         MRR Score
@@ -149,13 +149,13 @@ def compute_mrr_score(y_true: np.ndarray, y_score: np.ndarray):
 
 
 def compute_dcg_score(y_true: np.ndarray, y_score: np.ndarray, k: int):
-    """
+    r"""
     Calculate the DCG@k score
 
     Args:
-        y_true: Ground-truth labels
-        y_score: Predicted score
-        k: Only consider the highest ``k`` scores in the ranking
+        y_true: ground-truth labels.
+        y_score: predicted score.
+        k: only consider the highest ``k`` scores in the ranking.
 
     Returns:
         DCG@k score
@@ -170,13 +170,13 @@ def compute_dcg_score(y_true: np.ndarray, y_score: np.ndarray, k: int):
 
 
 def compute_ndcg_score(y_true: np.ndarray, y_score: np.ndarray, k: int):
-    """
+    r"""
     Calculate the nDCG@k score
 
     Args:
-        y_true: Ground-truth labels
-        y_score: Predicted score
-        k: Only consider the highest ``k`` scores in the ranking
+        y_true: ground-truth labels.
+        y_score: predicted score.
+        k: only consider the highest ``k`` scores in the ranking.
 
     Returns:
         nDCG@k score

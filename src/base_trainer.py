@@ -35,7 +35,7 @@ class BaseTrainer(ABC):
         pass
 
     def _init_logger(self):
-        """
+        r"""
         Initialize all loggers
 
         Returns:
@@ -85,7 +85,7 @@ class BaseTrainer(ABC):
         self._logger.setLevel(logging.INFO)
 
     def _log_arguments(self):
-        """
+        r"""
         Log all arguments
 
         Returns:
@@ -94,12 +94,12 @@ class BaseTrainer(ABC):
         logger_utils.log_json(path=self._path, data=self.args, name='args')
 
     def _log_dataset(self, train_dataset: Dataset, valid_dataset: Dataset):
-        """
+        r"""
         Log information about the dataset
 
         Args:
-            train_dataset: Training dataset
-            valid_dataset: Validation dataset
+            train_dataset: training dataset.
+            valid_dataset: validation dataset.
 
         Returns:
             None
@@ -109,7 +109,7 @@ class BaseTrainer(ABC):
         self._logger.info(f'Validation dataset: {len(valid_dataset)} samples')
 
     def _log_train_step(self, scheduler, loss, global_step):
-        """
+        r"""
         Log each step
 
         Args:
@@ -125,7 +125,7 @@ class BaseTrainer(ABC):
         self._writer.add_scalar('Learning rate per iteration', float(lr[0]), global_step=global_step)
 
     def _log_train(self, scheduler, loss, global_step, epoch):
-        """
+        r"""
         Log every ``logging_steps`` steps
 
         Args:
@@ -144,7 +144,7 @@ class BaseTrainer(ABC):
         self._writer.add_scalar('Training loss per logging step', loss, global_step=global_step)
 
     def _log_epoch(self, train_loss: float, valid_loss: float, scores: dict, epoch: int):
-        """
+        r"""
         Log at the end of each epoch
 
         Args:
@@ -172,8 +172,9 @@ class BaseTrainer(ABC):
         logger_utils.log_csv(self._eval_epoch, data)
 
     def _log_eval(self, global_step, loss: float = None, scores: dict = None):
-        """
+        r"""
         Log for the evaluation phase
+
         Args:
             global_step:
             loss:
@@ -197,7 +198,7 @@ class BaseTrainer(ABC):
         logger_utils.log_csv(self._eval_csv, data)
 
     def _save_model(self, model: nn.Module, optimizer, scheduler, flag: str):
-        """
+        r"""
         Save the model
 
         Args:
@@ -216,7 +217,7 @@ class BaseTrainer(ABC):
         torch.save(saved_point, save_path)
 
     def _load_model(self, model_path: str):
-        """
+        r"""
         Load the pre-trained model
 
         Args:
@@ -230,7 +231,7 @@ class BaseTrainer(ABC):
         return saved_point['model']
 
     def _get_warmup_steps(self, num_training_steps: int):
-        """
+        r"""
         Get number of steps used for a linear warmup
 
         Args:

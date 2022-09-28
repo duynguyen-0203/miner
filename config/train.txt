@@ -1,3 +1,4 @@
+# Common args
 --model_name Miner
 --pretrained_tokenizer vinai/phobert-base
 --user2id_path data/user2id.json
@@ -7,24 +8,34 @@
 --his_length 50
 --seed 36
 --metrics auc
+
+# Data args
 --data_name CafeF_News_Recommend_Data
 --train_behaviors_path data/train/behaviors.tsv
 --train_news_path data/train/news.tsv
 --eval_behaviors_path data/valid/behaviors.tsv
 --eval_news_path data/valid/news.tsv
+
+# Model args
 --pretrained_embedding vinai/phobert-base
 --apply_reduce_dim
+--use_sapo
 --word_embed_dim 256
+--category_embed_dim 100
+--combine_type linear
 --num_context_codes 32
 --context_code_dim 200
 --score_type weighted
 --dropout 0.2
+
+# Train args
 --npratio 4
---train_batch_size 16
+--train_batch_size 8
 --eval_batch_size 64
 --dataloader_drop_last
 --dataloader_num_workers 4
---gradient_accumulation_steps 8
+--dataloader_pin_memory
+--gradient_accumulation_steps 16
 --num_train_epochs 5
 --learning_rate 2e-5
 --warmup_ratio 0.1

@@ -23,14 +23,19 @@ def pairwise_cosine_similarity(x: Tensor, y: Tensor, zero_diagonal: bool = False
     distance = torch.matmul(torch.div(x, x_norm), torch.div(y, y_norm).permute(0, 2, 1))
     if zero_diagonal:
         assert x.shape[1] == y.shape[1]
-        mask = torch.eye(x.shape[1]).repeat(x.shape[0], 1, 1).bool()
+        mask = torch.eye(x.shape[1]).repeat(x.shape[0], 1, 1).bool().to(distance.device)
         distance.masked_fill_(mask, 0)
 
     return distance
 
 
+def load_embed(path: str):
+
+    return None
+
+
 def get_device() -> str:
-    """
+    r"""
     Return the device available for execution
 
     Returns:
@@ -42,12 +47,12 @@ def get_device() -> str:
 
 
 def to_device(batch: dict, device: object) -> dict:
-    """
+    r"""
     Convert a batch to the specified device
 
     Args:
-        batch: The batch needs to be converted
-        device: GPU or CPU
+        batch: the batch needs to be converted.
+        device: GPU or CPU.
 
     Returns:
         A batch after converting
@@ -60,6 +65,18 @@ def to_device(batch: dict, device: object) -> dict:
 
 
 def convert_arg_line_to_args(arg_line):
+    r"""
+    Convert a line of arguments into individual arguments
+
+    Args:
+        arg_line: a string read from the argument file.
+
+    Returns:
+        A list of arguments parsed from ``arg_line``
+    """
+    arg_line = arg_line.strip()
+    if arg_line.startswith('#') or arg_line == '':
+        return []
     for arg in arg_line.split():
         if not arg.strip():
             continue
@@ -67,11 +84,11 @@ def convert_arg_line_to_args(arg_line):
 
 
 def set_seed(seed: int):
-    """
+    r"""
     Sets the seed for generating random numbers
 
     Args:
-        seed: Seed value
+        seed: seed value.
 
     Returns:
         None
@@ -83,6 +100,16 @@ def set_seed(seed: int):
 
 
 def padded_stack(tensors: Union[List[Tensor], List[List]], padding: int = 0):
+    r"""
+    Pad a list of variable length Tensors with ``padding``
+
+    Args:
+        tensors: list of variable length sequences.
+        padding: value for padded elements. Default: 0.
+
+    Returns:
+        Padded sequences
+    """
     if type(tensors[0]) == list:
         tensors = [torch.tensor(tensor) for tensor in tensors]
     n_dim = len(list(tensors[0].shape))
@@ -90,25 +117,36 @@ def padded_stack(tensors: Union[List[Tensor], List[List]], padding: int = 0):
     padded_tensors = []
 
     for tensor in tensors:
-        extended_tensor = extend_tensor(tensor, max_shape, fill=padding)
+        extended_tensor = expand_tensor(tensor, max_shape, fill=padding)
         padded_tensors.append(extended_tensor)
 
     return torch.stack(padded_tensors)
 
 
-def extend_tensor(tensor: Tensor, extended_shape: List[int], fill: int = 0):
+def expand_tensor(tensor: Tensor, extended_shape: List[int], fill: int = 0):
+    r"""
+    Expand a tensor to ``extended_shape``
+
+    Args:
+        tensor: tensor to expand.
+        extended_shape: new shape.
+        fill: value for padded elements. Default: 0.
+
+    Returns:
+        An expanded tensor
+    """
     tensor_shape = tensor.shape
 
-    extended_tensor = torch.zeros(extended_shape, dtype=tensor.dtype).to(tensor.device)
-    extended_tensor = extended_tensor.fill_(fill)
+    expanded_tensor = torch.zeros(extended_shape, dtype=tensor.dtype).to(tensor.device)
+    expanded_tensor = expanded_tensor.fill_(fill)
 
     if len(tensor_shape) == 1:
-        extended_tensor[:tensor_shape[0]] = tensor
+        expanded_tensor[:tensor_shape[0]] = tensor
     elif len(tensor_shape) == 2:
-        extended_tensor[:tensor_shape[0], :tensor_shape[1]] = tensor
+        expanded_tensor[:tensor_shape[0], :tensor_shape[1]] = tensor
     elif len(tensor_shape) == 3:
-        extended_tensor[:tensor_shape[0], :tensor_shape[1], :tensor_shape[2]] = tensor
+        expanded_tensor[:tensor_shape[0], :tensor_shape[1], :tensor_shape[2]] = tensor
     elif len(tensor_shape) == 4:
-        extended_tensor[:tensor_shape[0], :tensor_shape[1], :tensor_shape[2], :tensor_shape[3]] = tensor
+        expanded_tensor[:tensor_shape[0], :tensor_shape[1], :tensor_shape[2], :tensor_shape[3]] = tensor
 
-    return extended_tensor
+    return expanded_tensor
