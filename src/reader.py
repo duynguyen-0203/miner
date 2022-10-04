@@ -25,8 +25,6 @@ class Reader:
             behaviors_tsv = csv.reader(f, delimiter='\t')
             for i, line in enumerate(behaviors_tsv):
                 self._parse_train_line(i, line, news_dataset, dataset)
-                if i == 1:
-                    break
 
         return dataset
 
@@ -36,8 +34,6 @@ class Reader:
             behaviors_tsv = csv.reader(f, delimiter='\t')
             for i, line in enumerate(behaviors_tsv):
                 self._parse_eval_line(i, line, news_dataset, dataset)
-                if i == 1:
-                    break
 
         return dataset
 

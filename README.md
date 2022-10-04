@@ -50,6 +50,12 @@ Download the data and save it in ```data/```.
 
 Single GPU training:
 
-``` shell
+```shell
 python main.py train @config/train.txt
 ```
+
+## Evaluation
+```shell
+python main.py eval @config/eval.txt --saved_model_path path_to_your_saved_model
+```
+
