@@ -201,6 +201,7 @@ class Trainer(BaseTrainer):
 
     def eval(self):
         args = self.args
+        self._log_arguments()
 
         # Load model
         model = self._load_model(args.saved_model_path)
@@ -209,8 +210,8 @@ class Trainer(BaseTrainer):
         # Read eval dataset
         reader = Reader(tokenizer=self._tokenizer, max_title_length=args.max_title_length,
                         max_sapo_length=args.max_sapo_length, user2id=self._user2id, category2id=self._category2id,
-                        max_his_click=args.max_his_click)
-        dataset = reader.read_eval_dataset(args.data_name, args.news_path, args.eval_behaviors_path)
+                        max_his_click=args.his_length, npratio=None)
+        dataset = reader.read_eval_dataset(args.data_name, args.eval_news_path, args.eval_behaviors_path)
         self._logger.info(f'Model: {self.args.model_name}')
         self._logger.info(f'Dataset: {self.args.data_name}')
         self._logger.info(f'Test dataset: {len(dataset)} samples')
@@ -220,7 +221,8 @@ class Trainer(BaseTrainer):
         self._logger.info('----------------  Evaluation phrase  ----------------')
         loss, scores = self._eval(model, dataset, loss_calculator, metrics=args.metrics,
                                   save_result=args.save_eval_result)
-        self._logger.info('Loss {}'.format(loss))
+        if 'loss' in self.args.evaluation_info:
+            self._logger.info('Loss {}'.format(loss))
         for metric in args.metrics:
             self._logger.info(f'Metric {metric}: {scores[metric]}')
 

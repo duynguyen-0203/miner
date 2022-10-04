@@ -11,11 +11,16 @@ def add_train_arguments(parser: argparse.ArgumentParser):
 def add_eval_arguments(parser: argparse.ArgumentParser):
     _add_common_arguments(parser)
     parser.add_argument('--saved_model_path', type=str, help='Path to the trained model')
-    parser.add_argument('--data_name', type=str, default='CafeFNewsRecommend', help='Name of the eval dataset')
-    parser.add_argument('--eval_behaviors_path', default='data/valid_behaviors.tsv', type=str)
+    parser.add_argument('--data_name', type=str, help='Name of the eval dataset')
+    parser.add_argument('--eval_behaviors_path', type=str,
+                        help='Path to the behaviors.tsv file for the evaluation phase')
+    parser.add_argument('--eval_news_path', type=str, help='Path to the news.tsv file for the evaluation phase')
     parser.add_argument('--fast_eval', action='store_true', help='Is there a fast evaluation for the eval dataset?')
     parser.add_argument('--eval_batch_size', type=int, help='How many samples per batch to load in the test phase')
     parser.add_argument('--dataloader_num_workers', type=int, help='How many subprocesses to use for data loading')
+    parser.add_argument('--dataloader_pin_memory', action='store_true', help='If True, the data loader will copy '
+                                                                             'Tensors into device/CUDA pinned memory '
+                                                                             'before returning them.')
     parser.add_argument('--eval_path', type=str, default='eval',
                         help='Path to the directory where evaluation information is stored')
 
@@ -33,6 +38,8 @@ def _add_common_arguments(parser: argparse.ArgumentParser):
     parser.add_argument('--seed', type=int, help='Seed value')
     parser.add_argument('--save_eval_result', action='store_true', help='Whether or not to save the evaluation result')
     parser.add_argument('--metrics', type=str, nargs='+', help='List of metrics used for evaluation')
+    parser.add_argument('--evaluation_info', type=str, nargs='+', choices=['loss', 'metrics'],
+                        help='Evaluation information to log')
 
 
 def _add_train_data_args(parser: argparse.ArgumentParser):
@@ -98,6 +105,4 @@ def _add_train_args(parser: argparse.ArgumentParser):
     parser.add_argument('--max_grad_norm', type=float, help='Max norms of the gradients')
     parser.add_argument('--weight_decay', type=float, help='Decoupled weight decay to apply')
     parser.add_argument('--logging_steps', type=int, help='Number of update steps between two logs')
-    parser.add_argument('--evaluation_info', type=str, nargs='+', choices=['loss', 'metrics'],
-                        help='Evaluation information to log')
     parser.add_argument('--eval_steps', type=int, help='Number of update steps between two evaluations')

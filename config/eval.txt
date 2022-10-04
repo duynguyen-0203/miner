@@ -1,0 +1,20 @@
+# Common args
+--model_name Miner
+--pretrained_tokenizer vinai/phobert-base
+--user2id_path data/user2id.json
+--category2id_path data/category2id.json
+--max_title_length 32
+--max_sapo_length 64
+--his_length 50
+--seed 36
+--save_eval_result
+--metrics auc mrr ndcg@5 ndcg@10
+--evaluation_info metrics
+
+# Eval args
+--data_name CafeFNewsRecommend
+--eval_behaviors_path data/test/behaviors.tsv
+--eval_news_path data/test/news.tsv
+--eval_batch_size 128
+--dataloader_num_workers 4
+--dataloader_pin_memory

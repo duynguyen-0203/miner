@@ -45,21 +45,21 @@ class BaseEvaluator(ABC):
                 scores['auc'] = score
             elif metric == 'group_auc':
                 list_score = [roc_auc_score(y_true=target, y_score=prob_prediction)
-                              for target, prob_prediction in zip(targets, prob_predictions)]
+                              for target, prob_prediction in zip(self.targets, self.prob_predictions)]
                 scores['group_auc'] = np.mean(list_score)
                 if save_result:
                     save_scores(os.path.join(path, 'group_auc.txt'), list_score)
             elif metric == 'mrr':
                 list_score = [compute_mrr_score(np.array(target), np.array(prob_prediction))
-                              for target, prob_prediction in zip(targets, prob_predictions)]
+                              for target, prob_prediction in zip(self.targets, self.prob_predictions)]
                 scores['mrr'] = np.mean(list_score)
                 if save_result:
                     save_scores(os.path.join(path, 'mrr.txt'), list_score)
             elif metric.startswith('ndcg'):
                 k = int(metric.split('@')[1])
                 list_score = [compute_ndcg_score(y_true=np.array(target), y_score=np.array(prob_prediction), k=k)
-                              for target, prob_prediction in zip(targets, prob_predictions)]
-                scores[f'ndcg{k}'] = np.mean(list_score)
+                              for target, prob_prediction in zip(self.targets, self.prob_predictions)]
+                scores[f'ndcg@{k}'] = np.mean(list_score)
                 if save_result:
                     save_scores(os.path.join(path, f'ndcg{k}.txt'), list_score)
 
