@@ -13,7 +13,7 @@ I run my code with `Python==3.9`, `pytorch==1.11.0`, `transformers==4.21.0`, `sc
 
 
 ### Dataset
-The datasets used in my experiments: [link](https://drive.google.com/file/d/1QvtKukmitPtV7Mhu3R-eOBNexHWljUtf/view?usp=sharing) 
+The datasets used in my experiments have some files: 
 
 
 | File Name        | Description                                      |
@@ -38,11 +38,12 @@ have been shuffled.
 The **news.tsv** file contains the detailed information of news articles involved in the **behaviors.tsv** file.
 It has 4 columns, which are divided by the tab symbol:
 
-* **News ID** 
-* **Title** 
-* **Category**
-* **Sapo**
+* **News ID**: The ID of a news 
+* **Title**: The title of a news 
+* **Category**: The category of a news
+* **Sapo**: The abstract/summary of a news
 
+In the **category2id.json** file and **user2id.json** file, I use the ```<unk>``` token to encode categories and users that are not in training set. In addition, the ```<pad>``` token is also added to those.
 
 ## Training
 Download the data and save it in ```data/```.
